@@ -55,25 +55,8 @@ RUN curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA
 RUN apt-get update -y && \
     apt-get install -y nvhpc-24-7-cuda-multi
 
-# Add the NVIDIA package repositories
-RUN echo "deb http://developer.download.nvidia.com/devtools/repos/ubuntu$(source /etc/lsb-release; echo "$DISTRIB_RELEASE" | tr -d .)/$(dpkg --print-architecture) /" | tee /etc/apt/sources.list.d/nvidia-devtools.list
-RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
-
-# update package list
-RUN apt update || true 
-
-# install nsight-systems and nsight-compute
-RUN apt install -y nsight-systems-2022.4.2 nsight-compute-2022.3.0
-
-# 安裝 CUDA 範例
-RUN git clone https://github.com/NVIDIA/cuda-samples.git /usr/local/cuda-samples
-
 # 設置環境變量以便能夠使用 PGI 編譯器 
-ENV PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/24.7/compilers/bin:/opt/nvidia/nsight-compute/2022.3.0/:${PATH}"
-
-# 创建 OpenCL 目录并配置 ICD 文件
-RUN mkdir -p /etc/OpenCL/vendors && \
-    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+ENV PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/24.7/compilers/bin:${PATH}"
 
 # Download and extract Eigen 3.4.0
 RUN mkdir -p /usr/include/eigen3 && \
