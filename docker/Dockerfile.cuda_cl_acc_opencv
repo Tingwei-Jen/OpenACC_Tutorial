@@ -1,0 +1,116 @@
+# 使用官方的 NVIDIA CUDA 基礎映像
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu18.04
+
+# 設置非互動模式，以避免安裝過程中需要手動輸入
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 更新和安裝必要的包
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    cmake \
+    git \
+    wget \
+    tar \
+    unzip \
+    yasm \
+    pkg-config \
+    libswscale-dev \
+    libtbb2 \
+    libtbb-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libavformat-dev \
+    libpq-dev \
+    libxine2-dev \
+    libglew-dev \
+    libtiff-dev \
+    zlib1g-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    libpostproc-dev \
+    libeigen3-dev \
+    libtbb-dev \
+    libgtk2.0-dev \
+    libgtk-3-dev \
+    libatlas-base-dev \
+    libgl1-mesa-glx \ 
+    gfortran \
+    g++ \
+    gnupg \
+    software-properties-common \
+    opencl-headers \
+    ocl-icd-libopencl1 \
+    ocl-icd-opencl-dev \
+    clinfo \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 添加 NVIDIA HPC SDK 的 GPG 密鑰和 APT 源
+RUN curl https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK | gpg --dearmor > /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg && \
+    echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' |  tee /etc/apt/sources.list.d/nvhpc.list
+
+# 更新 APT 包列表並安裝 NVIDIA HPC SDK
+RUN apt-get update -y && \
+    apt-get install -y nvhpc-24-7-cuda-multi
+
+# Add the NVIDIA package repositories
+RUN echo "deb http://developer.download.nvidia.com/devtools/repos/ubuntu$(source /etc/lsb-release; echo "$DISTRIB_RELEASE" | tr -d .)/$(dpkg --print-architecture) /" | tee /etc/apt/sources.list.d/nvidia-devtools.list
+RUN apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+
+# update package list
+RUN apt update || true 
+
+# install nsight-systems and nsight-compute
+RUN apt install -y nsight-systems-2022.4.2 nsight-compute-2022.3.0
+
+# 安裝 CUDA 範例
+RUN git clone https://github.com/NVIDIA/cuda-samples.git /usr/local/cuda-samples
+
+# 設置環境變量以便能夠使用 PGI 編譯器 
+ENV PATH="/opt/nvidia/hpc_sdk/Linux_x86_64/24.7/compilers/bin:/opt/nvidia/nsight-compute/2022.3.0/:${PATH}"
+
+# 创建 OpenCL 目录并配置 ICD 文件
+RUN mkdir -p /etc/OpenCL/vendors && \
+    echo "libnvidia-opencl.so.1" > /etc/OpenCL/vendors/nvidia.icd
+
+# Download and extract Eigen 3.4.0
+RUN mkdir -p /usr/include/eigen3 && \
+    wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz && \
+    tar -xvzf eigen-3.4.0.tar.gz -C /usr/include/eigen3 --strip-components=1 && \
+    rm eigen-3.4.0.tar.gz
+
+# Clone OpenCV repository and checkout specific version (adjust version as needed)
+RUN git clone https://github.com/opencv/opencv.git /opt/opencv && \
+    cd /opt/opencv && \
+    git checkout tags/4.5.2
+
+# Clone OpenCV contrib repository and checkout specific version (adjust version as needed)
+RUN git clone https://github.com/opencv/opencv_contrib.git /opt/opencv_contrib && \
+    cd /opt/opencv_contrib && \
+    git checkout tags/4.5.2
+
+# 創建並進入構建目錄
+RUN mkdir -p /opt/opencv/build && cd /opt/opencv/build \
+    && cmake -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_INSTALL_PREFIX=/usr/local \
+    -D OPENCV_EXTRA_MODULES_PATH=/opt/opencv_contrib/modules \
+    -D WITH_CUDA=ON \
+    -D WITH_CUDNN=ON \
+    -D CUDA_ARCH_BIN=6.1 \
+    -D CUDA_ARCH_PTX="" \
+    -D WITH_TBB=ON \
+    -D WITH_V4L=ON \
+    -D WITH_QT=OFF \
+    -D WITH_OPENGL=ON \
+    -D BUILD_EXAMPLES=OFF .. \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig
+
+# 設置工作目錄
+WORKDIR /workspace
+
+# 預設運行的命令
+CMD ["bash"]
