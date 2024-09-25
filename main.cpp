@@ -19,9 +19,9 @@ void vectorAddition() {
 
     #pragma acc parallel num_gangs(10) num_workers(4) vector_length(32) copyin(h_a[0:dataSize], h_b[0:dataSize]) copyout(h_c[0:dataSize])
     {
-        #pragma acc loop gang
+        #pragma acc loop gang worker
         for (int i = 0; i < dataSize; i++) {
-            #pragma acc loop worker
+            #pragma acc loop vector
             for (int j = 0; j < 4; j++) {
                 h_c[i] = h_a[i] + h_b[i];
             }
